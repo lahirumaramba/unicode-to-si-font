@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unicode to FMAbhaya Converter</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Unicode to FMAbhaya</h1>
+            <p class="subtitle">Convert Sinhala Unicode to legacy font mapping</p>
+        </header>
+
+        <div class="options">
+            <label class="toggle-label">
+                <input type="checkbox" id="preserve-english" checked>
+                <span class="toggle-text">Preserve English words</span>
+            </label>
+        </div>
+
+        <div class="converter-grid">
+            <div class="input-group">
+                <label for="unicode-input">Unicode Input (Sinhala)</label>
+                <textarea id="unicode-input" placeholder="Type or paste Sinhala Unicode text here..."></textarea>
+            </div>
+
+            <div class="input-group output-container">
+                <label for="output">FMAbhaya ASCII Output</label>
+                <div id="copy-status" class="copy-success">Copied!</div>
+                <textarea id="output" readonly placeholder="Converted text will appear here..."></textarea>
+                <div class="actions">
+                    <button id="copy-btn" class="secondary-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        Copy Raw ASCII
+                    </button>
+                    <button id="copy-formatted-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 18h6"></path><path d="M9 10h6"></path></svg>
+                        Copy with Formatting (for Word)
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="preview-container">
+            <label>Smart Preview (Mixed Fonts)</label>
+            <div id="preview" class="preview-area">
+                <span class="text-muted">Start typing to see the preview...</span>
+            </div>
+        </div>
+
+        <footer>
+            <p>Based on the logic by <a href="https://projects.malinthe.com/converter/" target="_blank">Malinthe Samarakoon</a></p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
