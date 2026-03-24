@@ -117,8 +117,9 @@ function convert(unicodeText, preserveEnglish) {
         return mapping.reduce((result, { p, r }) => result.replace(p, r), unicodeText);
     }
 
-    // Preserve English words logic
-    const tokens = unicodeText.split(/(\s+)/);
+    // Improved tokenization: split by Sinhala character blocks
+    // This allows mixed words like "sinhala/english" to be handled correctly
+    const tokens = unicodeText.split(/([\u0d80-\u0dff\u200d\u200c]+)/);
     return tokens.map(token => {
         if (/[\u0d80-\u0dff]/.test(token)) {
             return mapping.reduce((result, { p, r }) => result.replace(p, r), token);
@@ -147,13 +148,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const renderPreview = (text, preserveEnglish) => {
         previewArea.innerHTML = '';
+
         if (!text) {
             previewArea.innerHTML = '<span class="text-muted" style="font-size: 1rem; font-family: Inter;">Start typing to see the preview...</span>';
             return;
         }
 
-        const tokens = text.split(/(\s+)/);
+        if (!preserveEnglish) {
+            // Global conversion mode: everything is legacy font
+            const span = document.createElement('span');
+            span.className = 'font-legacy';
+            span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), text);
+            previewArea.appendChild(span);
+            return;
+        }
+
+        // Smart split to handle words mixed with punctuation/slashes
+        const tokens = text.split(/([\u0d80-\u0dff\u200d\u200c]+)/);
+        
         tokens.forEach(token => {
+            if (!token) return;
             const span = document.createElement('span');
             const hasSinhala = /[\u0d80-\u0dff]/.test(token);
 
@@ -161,13 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 span.className = 'font-legacy';
                 span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token);
             } else {
-                if (!preserveEnglish) {
-                    span.className = 'font-legacy';
-                    span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token);
-                } else {
-                    span.className = 'font-std';
-                    span.textContent = token;
-                }
+                span.className = 'font-std';
+                span.textContent = token;
             }
             previewArea.appendChild(span);
         });
