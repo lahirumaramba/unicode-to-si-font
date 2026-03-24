@@ -161,25 +161,26 @@ textarea:focus {
 
 .preview-area {
     width: 100%;
-    min-height: 100px;
+    min-height: 120px;
     padding: 1.25rem;
     border: 2px dashed var(--border-color);
     border-radius: 16px;
     background: white;
-    font-size: 1.5rem;
-    line-height: 1.8;
+    font-size: 14pt;
+    line-height: 1.6;
 }
 
 .font-legacy {
     font-family: 'FMAbhaya', serif;
+    font-size: 14pt;
 }
 
 .font-std {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Aptos', 'Inter', sans-serif;
+    font-size: 14pt;
     background: #f1f5f9;
     padding: 0 4px;
     border-radius: 4px;
-    font-size: 1rem;
     vertical-align: middle;
 }
 

@@ -193,14 +193,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Copy with Formatting (for Word)
     copyFormattedBtn.addEventListener('click', async () => {
+        const escapeHTML = (text) => {
+            return text.replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            })[m]);
+        };
+
         try {
             // Create a clean HTML version for the clipboard
-            // Word prefers standard inline styles
             const htmlChunks = Array.from(previewArea.childNodes).map(node => {
-                if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+                const text = node.textContent;
+                if (node.nodeType === Node.TEXT_NODE) return escapeHTML(text);
+                
                 const isLegacy = node.classList.contains('font-legacy');
-                const font = isLegacy ? "'FMAbhaya', serif" : "'Inter', sans-serif";
-                return `<span style="font-family: ${font};">${node.textContent}</span>`;
+                const font = isLegacy ? "'FMAbhaya', serif" : "'Aptos', sans-serif";
+                return `<span style="font-family: ${font}; font-size: 14pt;">${escapeHTML(text)}</span>`;
             }).join('');
 
             const plainText = previewArea.innerText;
