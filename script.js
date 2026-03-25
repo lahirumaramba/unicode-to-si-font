@@ -117,11 +117,31 @@ function convert(unicodeText, preserveEnglish) {
         return mapping.reduce((result, { p, r }) => result.replace(p, r), unicodeText);
     }
 
-    // Improved tokenization: split by Sinhala character blocks
-    // This allows mixed words like "sinhala/english" to be handled correctly
-    const tokens = unicodeText.split(/([\u0d80-\u0dff\u200d\u200c]+)/);
+    // Improved tokenization: split into blocks of Sinhala, English/Numbers, and Others (Punctuation/Spaces)
+    const tokens = unicodeText.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+)/);
+    
+    // Sticky Font Logic: Neutral characters (punctuation/spaces) inherit the previous font state
+    let isLastTokenSinhala = true; 
+
     return tokens.map(token => {
-        if (/[\u0d80-\u0dff]/.test(token)) {
+        if (!token) return '';
+        
+        const hasSinhala = /[\u0d80-\u0dff]/.test(token);
+        const hasEnglish = /[a-zA-Z0-9]/.test(token);
+        const isNeutral = !hasSinhala && !hasEnglish;
+
+        let shouldMap = false;
+        if (hasSinhala) {
+            shouldMap = true;
+        } else if (hasEnglish) {
+            shouldMap = false;
+        } else if (isNeutral) {
+            shouldMap = isLastTokenSinhala;
+        }
+
+        isLastTokenSinhala = shouldMap;
+
+        if (shouldMap) {
             return mapping.reduce((result, { p, r }) => result.replace(p, r), token);
         }
         return token;
@@ -163,16 +183,32 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Smart split to handle words mixed with punctuation/slashes
-        const tokens = text.split(/([\u0d80-\u0dff\u200d\u200c]+)/);
+        // Improved tokenization: split into blocks of Sinhala, English/Numbers, and Others (Punctuation/Spaces)
+        const tokens = text.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+)/);
         
+        // Sticky Font Logic: Punctuation/spaces inherit the preceding font
+        let isLastTokenLegacy = true;
+
         tokens.forEach(token => {
             if (!token) return;
             const span = document.createElement('span');
+            
             const hasSinhala = /[\u0d80-\u0dff]/.test(token);
-            const isWhitespace = /^\s+$/.test(token);
+            const hasEnglish = /[a-zA-Z0-9]/.test(token);
+            const isNeutral = !hasSinhala && !hasEnglish;
 
-            if (hasSinhala || isWhitespace) {
+            let useLegacy = false;
+            if (hasSinhala) {
+                useLegacy = true;
+            } else if (hasEnglish) {
+                useLegacy = false;
+            } else if (isNeutral) {
+                useLegacy = isLastTokenLegacy;
+            }
+
+            isLastTokenLegacy = useLegacy;
+
+            if (useLegacy) {
                 span.className = 'font-legacy';
                 span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token);
             } else {
