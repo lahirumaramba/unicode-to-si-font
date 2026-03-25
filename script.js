@@ -144,7 +144,7 @@ function convert(unicodeText, preserveEnglish) {
             const prevIsSinhala = prevSub?.type === 'sinhala';
 
             if (token.type === 'whitespace') {
-                shouldMap = nextIsSinhala || (prevIsSinhala && !nextSub);
+                shouldMap = nextIsSinhala || prevIsSinhala;
             } else if (/^[(\[{]$/.test(token.text)) {
                 shouldMap = nextSub ? nextIsSinhala : prevIsSinhala;
             } else if (/^[)\]},.!?:;%]$/.test(token.text)) {
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const prevIsSinhala = prevSub?.type === 'sinhala';
 
                 if (token.type === 'whitespace') {
-                    useLegacy = nextIsSinhala || (prevIsSinhala && !nextSub);
+                    useLegacy = nextIsSinhala || prevIsSinhala;
                 } else if (/^[(\[{]$/.test(token.text)) {
                     useLegacy = nextSub ? nextIsSinhala : prevIsSinhala;
                 } else if (/^[)\]},.!?:;%]$/.test(token.text)) {
