@@ -16,40 +16,70 @@
             <p class="subtitle">Convert Sinhala Unicode to legacy font mapping</p>
         </header>
 
-        <div class="options">
-            <label class="toggle-label">
-                <input type="checkbox" id="preserve-english" checked>
-                <span class="toggle-text">Preserve English words</span>
-            </label>
+        <div class="tabs-container">
+            <button class="tab-btn active" data-tab="forward-tab">Unicode → FMAbhaya</button>
+            <button class="tab-btn" data-tab="reverse-tab">FMAbhaya → Unicode</button>
         </div>
 
-        <div class="converter-grid">
-            <div class="input-group">
-                <label for="unicode-input">Unicode Input (Sinhala)</label>
-                <textarea id="unicode-input" placeholder="Type or paste Sinhala Unicode text here..."></textarea>
+        <!-- Forward Converter Tab -->
+        <div id="forward-tab" class="tab-content active">
+            <div class="options">
+                <label class="toggle-label">
+                    <input type="checkbox" id="preserve-english" checked>
+                    <span class="toggle-text">Preserve English words</span>
+                </label>
             </div>
 
-            <div class="input-group output-container">
-                <label for="output">FMAbhaya ASCII Output</label>
-                <div id="copy-status" class="copy-success">Copied!</div>
-                <textarea id="output" readonly placeholder="Converted text will appear here..."></textarea>
-                <div class="actions">
-                    <button id="copy-btn" class="secondary-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        Copy Raw ASCII
-                    </button>
-                    <button id="copy-formatted-btn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 18h6"></path><path d="M9 10h6"></path></svg>
-                        Copy with Formatting (for Word)
-                    </button>
+            <div class="converter-grid">
+                <div class="input-group">
+                    <label for="unicode-input">Unicode Input (Sinhala)</label>
+                    <textarea id="unicode-input" placeholder="Type or paste Sinhala Unicode text here..."></textarea>
+                </div>
+
+                <div class="input-group output-container">
+                    <label for="output">FMAbhaya ASCII Output</label>
+                    <div id="copy-status" class="copy-success">Copied!</div>
+                    <textarea id="output" readonly placeholder="Converted text will appear here..."></textarea>
+                    <div class="actions">
+                        <button id="copy-btn" class="secondary-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy Raw ASCII
+                        </button>
+                        <button id="copy-formatted-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 18h6"></path><path d="M9 10h6"></path></svg>
+                            Copy with Formatting
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="preview-container">
+                <label>Smart Preview (Mixed Fonts)</label>
+                <div id="preview" class="preview-area">
+                    <span class="text-muted">Start typing to see the preview...</span>
                 </div>
             </div>
         </div>
 
-        <div class="preview-container">
-            <label>Smart Preview (Mixed Fonts)</label>
-            <div id="preview" class="preview-area">
-                <span class="text-muted">Start typing to see the preview...</span>
+        <!-- Reverse Converter Tab -->
+        <div id="reverse-tab" class="tab-content">
+            <div class="converter-grid">
+                <div class="input-group">
+                    <label for="legacy-input">FMAbhaya Input (Legacy)</label>
+                    <textarea id="legacy-input" class="font-legacy" placeholder="Paste FMAbhaya legacy text here..."></textarea>
+                </div>
+
+                <div class="input-group output-container">
+                    <label for="unicode-output">Unicode Output</label>
+                    <div id="reverse-copy-status" class="copy-success">Copied!</div>
+                    <textarea id="unicode-output" readonly placeholder="Converted Unicode text will appear here..."></textarea>
+                    <div class="actions">
+                        <button id="reverse-copy-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h6"></path><path d="M9 18h6"></path><path d="M9 10h6"></path></svg>
+                            Copy Unicode
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 

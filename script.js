@@ -112,6 +112,21 @@ const mapping = [
     {p:/f\(d/g,r:"f:d"}
 ];
 
+const reverseMapping = mapping
+    .map(({ p, r }) => ({
+        // Escape special characters in r for use in RegExp
+        p: new RegExp(r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+        // Use the source of the forward RegExp as the replacement string
+        r: p.source.replace(/\\/g, '') 
+    }))
+    // Sort by pattern length descending to match longest sequences first
+    .sort((a, b) => b.p.source.length - a.p.source.length);
+
+function reverseConvert(legacyText) {
+    if (!legacyText) return "";
+    return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), legacyText);
+}
+
 function convert(unicodeText, preserveEnglish) {
     if (!preserveEnglish) {
         return mapping.reduce((result, { p, r }) => result.replace(p, r), unicodeText);
@@ -162,6 +177,7 @@ function convert(unicodeText, preserveEnglish) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Forward Converter Elements
     const inputArea = document.getElementById('unicode-input');
     const outputArea = document.getElementById('output');
     const copyBtn = document.getElementById('copy-btn');
@@ -170,25 +186,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const preserveToggle = document.getElementById('preserve-english');
     const previewArea = document.getElementById('preview');
 
-    const updateConversion = () => {
+    // Reverse Converter Elements
+    const legacyInput = document.getElementById('legacy-input');
+    const unicodeOutput = document.getElementById('unicode-output');
+    const reverseCopyBtn = document.getElementById('reverse-copy-btn');
+    const reverseCopyStatus = document.getElementById('reverse-copy-status');
+
+    // Tab Interface
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    const showCopyStatus = (statusEl) => {
+        statusEl.classList.add('show');
+        setTimeout(() => {
+            statusEl.classList.remove('show');
+        }, 2000);
+    };
+
+    // Tab Switching Logic
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.getAttribute('data-tab');
+            
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabContents.forEach(c => c.classList.remove('active'));
+            
+            btn.classList.add('active');
+            document.getElementById(target).classList.add('active');
+        });
+    });
+
+    // Forward Conversion logic
+    const updateForwardConversion = () => {
         const unicodeText = inputArea.value;
         const convertedText = convert(unicodeText, preserveToggle.checked);
         outputArea.value = convertedText;
-
-        // Smart Preview Logic
         renderPreview(unicodeText, preserveToggle.checked);
     };
 
     const renderPreview = (text, preserveEnglish) => {
         previewArea.innerHTML = '';
-
         if (!text) {
             previewArea.innerHTML = '<span class="text-muted" style="font-size: 1rem; font-family: Inter;">Start typing to see the preview...</span>';
             return;
         }
 
         if (!preserveEnglish) {
-            // Global conversion mode: everything is legacy font
             const span = document.createElement('span');
             span.className = 'font-legacy';
             span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), text);
@@ -196,7 +239,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Character-level tokenization for precise control
         const rawTokens = text.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+|\s+|.)/);
         const analyzedTokens = rawTokens.map(token => {
             if (!token) return null;
@@ -220,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 const nextSub = analyzedTokens.slice(index + 1).find(t => t.type === 'sinhala' || t.type === 'english');
                 const prevSub = analyzedTokens.slice(0, index).reverse().find(t => t.type === 'sinhala' || t.type === 'english');
-
                 const nextIsSinhala = nextSub?.type === 'sinhala';
                 const prevIsSinhala = prevSub?.type === 'sinhala';
 
@@ -229,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (/^[(\[{]$/.test(token.text)) {
                     useLegacy = nextSub ? nextIsSinhala : prevIsSinhala;
                 } else if (/^[)\]},.!?:;%]$/.test(token.text)) {
-                    // Fix: Closing bracket should follow previous word, UNLESS there is no previous word
                     useLegacy = prevSub ? prevIsSinhala : nextIsSinhala;
                 } else {
                     useLegacy = nextIsSinhala || prevIsSinhala;
@@ -247,64 +287,58 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // Real-time conversion
-    inputArea.addEventListener('input', updateConversion);
-    preserveToggle.addEventListener('change', updateConversion);
-
-    const showCopySuccess = () => {
-        copyStatus.classList.add('show');
-        setTimeout(() => {
-            copyStatus.classList.remove('show');
-        }, 2000);
+    // Reverse Conversion logic
+    const updateReverseConversion = () => {
+        const legacyText = legacyInput.value;
+        const unicodeText = reverseConvert(legacyText);
+        unicodeOutput.value = unicodeText;
     };
 
-    // Copy Raw ASCII (for legacy software)
+    // Event Listeners
+    inputArea.addEventListener('input', updateForwardConversion);
+    preserveToggle.addEventListener('change', updateForwardConversion);
+    legacyInput.addEventListener('input', updateReverseConversion);
+
     copyBtn.addEventListener('click', () => {
         outputArea.select();
         document.execCommand('copy');
-        showCopySuccess();
+        showCopyStatus(copyStatus);
     });
 
-    // Copy with Formatting (for Word)
+    reverseCopyBtn.addEventListener('click', () => {
+        unicodeOutput.select();
+        document.execCommand('copy');
+        showCopyStatus(reverseCopyStatus);
+    });
+
     copyFormattedBtn.addEventListener('click', async () => {
         const escapeHTML = (text) => {
             return text.replace(/[&<>"']/g, (m) => ({
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
             })[m]);
         };
 
         try {
-            // Create a clean HTML version for the clipboard
             const htmlChunks = Array.from(previewArea.childNodes).map(node => {
                 const text = node.textContent;
                 if (node.nodeType === Node.TEXT_NODE) return escapeHTML(text);
-                
                 const isLegacy = node.classList.contains('font-legacy');
                 const font = isLegacy ? "'FMAbhaya', serif" : "'Aptos', sans-serif";
                 return `<span style="font-family: ${font}; font-size: 14pt;">${escapeHTML(text)}</span>`;
             }).join('');
 
             const plainText = previewArea.innerText;
-            const htmlBlob = new Blob([htmlChunks], { type: 'text/html' });
-            const textBlob = new Blob([plainText], { type: 'text/plain' });
-
             const data = [new ClipboardItem({
-                ['text/html']: htmlBlob,
-                ['text/plain']: textBlob
+                ['text/html']: new Blob([htmlChunks], { type: 'text/html' }),
+                ['text/plain']: new Blob([plainText], { type: 'text/plain' })
             })];
 
             await navigator.clipboard.write(data);
-            showCopySuccess();
+            showCopyStatus(copyStatus);
         } catch (err) {
-            console.error('Failed to copy formatted text: ', err);
-            // Fallback to simple copy if Clipboard API fails
             outputArea.select();
             document.execCommand('copy');
-            showCopySuccess();
+            showCopyStatus(copyStatus);
         }
     });
 });
