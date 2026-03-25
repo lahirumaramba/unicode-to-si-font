@@ -117,34 +117,47 @@ function convert(unicodeText, preserveEnglish) {
         return mapping.reduce((result, { p, r }) => result.replace(p, r), unicodeText);
     }
 
-    // Improved tokenization: split into blocks of Sinhala, English/Numbers, and Others (Punctuation/Spaces)
-    const tokens = unicodeText.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+)/);
-    
-    // Sticky Font Logic: Neutral characters (punctuation/spaces) inherit the previous font state
-    let isLastTokenSinhala = true; 
-
-    return tokens.map(token => {
-        if (!token) return '';
-        
+    // Character-level tokenization for precise control
+    const rawTokens = unicodeText.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+|\s+|.)/);
+    const analyzedTokens = rawTokens.map(token => {
+        if (!token) return null;
         const hasSinhala = /[\u0d80-\u0dff]/.test(token);
         const hasEnglish = /[a-zA-Z0-9]/.test(token);
-        const isNeutral = !hasSinhala && !hasEnglish;
+        const isWhitespace = /^\s+$/.test(token);
+        return {
+            text: token,
+            type: hasSinhala ? 'sinhala' : (hasEnglish ? 'english' : (isWhitespace ? 'whitespace' : 'neutral'))
+        };
+    }).filter(t => t !== null);
 
+    return analyzedTokens.map((token, index) => {
         let shouldMap = false;
-        if (hasSinhala) {
+        if (token.type === 'sinhala') {
             shouldMap = true;
-        } else if (hasEnglish) {
+        } else if (token.type === 'english') {
             shouldMap = false;
-        } else if (isNeutral) {
-            shouldMap = isLastTokenSinhala;
-        }
+        } else {
+            const nextSub = analyzedTokens.slice(index + 1).find(t => t.type === 'sinhala' || t.type === 'english');
+            const prevSub = analyzedTokens.slice(0, index).reverse().find(t => t.type === 'sinhala' || t.type === 'english');
 
-        isLastTokenSinhala = shouldMap;
+            const nextIsSinhala = nextSub?.type === 'sinhala';
+            const prevIsSinhala = prevSub?.type === 'sinhala';
+
+            if (token.type === 'whitespace') {
+                shouldMap = nextIsSinhala || (prevIsSinhala && !nextSub);
+            } else if (/^[(\[{]$/.test(token.text)) {
+                shouldMap = nextSub ? nextIsSinhala : prevIsSinhala;
+            } else if (/^[)\]},.!?:;%]$/.test(token.text)) {
+                shouldMap = prevSub ? prevIsSinhala : nextIsSinhala;
+            } else {
+                shouldMap = nextIsSinhala || prevIsSinhala;
+            }
+        }
 
         if (shouldMap) {
-            return mapping.reduce((result, { p, r }) => result.replace(p, r), token);
+            return mapping.reduce((result, { p, r }) => result.replace(p, r), token.text);
         }
-        return token;
+        return token.text;
     }).join('');
 }
 
@@ -183,37 +196,52 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Improved tokenization: split into blocks of Sinhala, English/Numbers, and Others (Punctuation/Spaces)
-        const tokens = text.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+)/);
-        
-        // Sticky Font Logic: Punctuation/spaces inherit the preceding font
-        let isLastTokenLegacy = true;
-
-        tokens.forEach(token => {
-            if (!token) return;
-            const span = document.createElement('span');
-            
+        // Character-level tokenization for precise control
+        const rawTokens = text.split(/([\u0d80-\u0dff\u200d\u200c]+|[a-zA-Z0-9]+|\s+|.)/);
+        const analyzedTokens = rawTokens.map(token => {
+            if (!token) return null;
             const hasSinhala = /[\u0d80-\u0dff]/.test(token);
             const hasEnglish = /[a-zA-Z0-9]/.test(token);
-            const isNeutral = !hasSinhala && !hasEnglish;
-
+            const isWhitespace = /^\s+$/.test(token);
+            return {
+                text: token,
+                type: hasSinhala ? 'sinhala' : (hasEnglish ? 'english' : (isWhitespace ? 'whitespace' : 'neutral'))
+            };
+        }).filter(t => t !== null);
+        
+        analyzedTokens.forEach((token, index) => {
+            const span = document.createElement('span');
             let useLegacy = false;
-            if (hasSinhala) {
-                useLegacy = true;
-            } else if (hasEnglish) {
-                useLegacy = false;
-            } else if (isNeutral) {
-                useLegacy = isLastTokenLegacy;
-            }
 
-            isLastTokenLegacy = useLegacy;
+            if (token.type === 'sinhala') {
+                useLegacy = true;
+            } else if (token.type === 'english') {
+                useLegacy = false;
+            } else {
+                const nextSub = analyzedTokens.slice(index + 1).find(t => t.type === 'sinhala' || t.type === 'english');
+                const prevSub = analyzedTokens.slice(0, index).reverse().find(t => t.type === 'sinhala' || t.type === 'english');
+
+                const nextIsSinhala = nextSub?.type === 'sinhala';
+                const prevIsSinhala = prevSub?.type === 'sinhala';
+
+                if (token.type === 'whitespace') {
+                    useLegacy = nextIsSinhala || (prevIsSinhala && !nextSub);
+                } else if (/^[(\[{]$/.test(token.text)) {
+                    useLegacy = nextSub ? nextIsSinhala : prevIsSinhala;
+                } else if (/^[)\]},.!?:;%]$/.test(token.text)) {
+                    // Fix: Closing bracket should follow previous word, UNLESS there is no previous word
+                    useLegacy = prevSub ? prevIsSinhala : nextIsSinhala;
+                } else {
+                    useLegacy = nextIsSinhala || prevIsSinhala;
+                }
+            }
 
             if (useLegacy) {
                 span.className = 'font-legacy';
-                span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token);
+                span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token.text);
             } else {
                 span.className = 'font-std';
-                span.textContent = token;
+                span.textContent = token.text;
             }
             previewArea.appendChild(span);
         });
