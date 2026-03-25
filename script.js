@@ -170,8 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!token) return;
             const span = document.createElement('span');
             const hasSinhala = /[\u0d80-\u0dff]/.test(token);
+            const isWhitespace = /^\s+$/.test(token);
 
-            if (hasSinhala) {
+            if (hasSinhala || isWhitespace) {
                 span.className = 'font-legacy';
                 span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token);
             } else {
