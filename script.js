@@ -112,15 +112,37 @@ const mapping = [
     {p:/f\(d/g,r:"f:d"}
 ];
 
-const reverseMapping = mapping
-    .map(({ p, r }) => ({
-        // Escape special characters in r for use in RegExp
-        p: new RegExp(r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-        // Use the source of the forward RegExp as the replacement string
-        r: p.source.replace(/\\/g, '') 
-    }))
-    // Sort by pattern length descending to match longest sequences first
-    .sort((a, b) => b.p.source.length - a.p.source.length);
+// Pre-calculate Reverse Single-Pass logic using fully resolved forward chains
+const reverseRegexPatterns = [];
+const reverseLookup = new Map();
+
+// By evaluating every source Unicode string through the entire forward mapping,
+// we find its FINAL legacy representation (resolving intermediate chains like ',' -> '￦' -> '"').
+mapping.forEach(m => {
+    const unicodeString = m.p.source.replace(/\\/g, '');
+    const legacyString = mapping.reduce((result, { p, r }) => result.replace(p, r), unicodeString);
+    
+    // Only map if this legacy string doesn't already map to something else.
+    // Because mapping is ordered by importance, the first encountered mapping wins.
+    if (!reverseLookup.has(legacyString)) {
+        reverseLookup.set(legacyString, unicodeString);
+        // Escape the legacy string for the combined regex
+        reverseRegexPatterns.push(legacyString.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    }
+});
+
+// Sort patterns by descending unescaped length to match greedy legacy sequences first ('fuda' before 'u')
+reverseRegexPatterns.sort((a, b) => b.replace(/\\./g, '_').length - a.replace(/\\./g, '_').length);
+const reverseRegex = new RegExp(reverseRegexPatterns.join('|'), 'g');
+
+/**
+ * Performs a single-pass replacement using a combined regex and lookup map.
+ * This prevents the chained "double-replacement" bugs seen in the sequential reduce.
+ */
+function performSinglePass(text, regex, lookup) {
+    if (!text) return "";
+    return text.replace(regex, match => lookup.get(match) ?? match);
+}
 
 // Heuristic to detect if a word is likely English/Technical rather than Legacy Sinhala
 function isEnglish(word) {
@@ -131,28 +153,26 @@ function isEnglish(word) {
         if (word.charCodeAt(i) > 127) return false;
     }
 
-    // 2. If it contains symbols frequently used in legacy pilla/hal-kirilla mappings
-    // Symbols like =, !, %, +, *, º, ^, &, (, ), [, ], {, }, /, ?, :, ;, ,, ., ', ~, |
-    if (/[=!%+º^&()\[\]{}/?:;.,'~|]/.test(word)) return false;
-
-    // 3. All-Caps acronyms (length > 1) are likely English (XRD, DNA)
+    // 2. All-Caps acronyms (length > 1) are likely English (XRD, DNA, FT)
     if (word.length > 1 && /^[A-Z0-9]+$/.test(word)) return true;
 
-    // 4. TitleCase (length > 1) are likely English/Proper nouns (Ca, Iron, Fe)
-    if (word.length > 1 && /^[A-Z][a-z0-9]+$/.test(word)) return true;
+    // 3. Exact Case-Sensitive Match for known technical terms/elements
+    // This avoids false positives like 'ca' (which is ජ් in legacy) or 'Yaf'
+    const exactMatches = new Set(['Ca', 'Fe', 'Ti', 'Mg', 'Al', 'Zn', 'Cu', 'Pb', 'Ag', 'Au', 'K', 'Na', 'Cl', 'O', 'H', 'C', 'N', 'S', 'P']);
+    if (exactMatches.has(word)) return true;
 
-    // 5. Common English stop-words and technical terms
+    // 4. Common English stop-words and materials science terms
     const stopWords = new Set([
-        'and', 'the', 'for', 'was', 'with', 'from', 'this', 'that', 'layer', 'paint', 'result',
-        'sample', 'analysis', 'data', 'using', 'based', 'both', 'between', 'mixed', 'font',
+        'and', 'the', 'for', 'was', 'with', 'from', 'this', 'that', 'layer', 'paint', 'result', 'receiving',
+        'sample', 'analysis', 'data', 'using', 'based', 'both', 'between', 'mixed', 'font', 'calcite',
         'through', 'during', 'should', 'could', 'would', 'above', 'below', 'which', 'where'
     ]);
     if (stopWords.has(word.toLowerCase())) return true;
 
-    // 6. If it contains digits mixed with letters (K3, H2O)
+    // 5. If it contains digits mixed with letters (K3, H2O)
     if (/[0-9]/.test(word) && /[a-zA-Z]/.test(word)) return true;
 
-    // Default to false (treat as legacy) for strings like 'isa' which could be legacy 'සි'
+    // Default to false (treat as legacy) for strings like 'Yaf', 'ca', 'isxy'
     return false;
 }
 
@@ -160,24 +180,30 @@ function reverseConvert(legacyText, preserveEnglish) {
     if (!legacyText) return "";
     
     if (!preserveEnglish) {
-        return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), legacyText);
+        return performSinglePass(legacyText, reverseRegex, reverseLookup);
     }
 
-    // Tokenize by standard ASCII alphanumeric sequences vs everything else
-    // This isolates potential English words from Sinhala Unicode or symbols
-    const tokens = legacyText.split(/([a-zA-Z0-9]+)/);
+    // Tokenize by whitespace to keep legacy letter sequences (like 'f,a') perfectly intact.
+    const tokens = legacyText.split(/(\s+)/);
     return tokens.map(token => {
-        if (!token) return "";
-        // If it's a potential English word (pure ASCII alphanumeric)
-        if (/^[a-zA-Z0-9]+$/.test(token)) {
-            if (isEnglish(token)) {
-                return token; // Preserve English
-            } else {
-                return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), token);
-            }
-        }
-        // For everything else (Unicode, symbols, whitespace), apply mapping
-        return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), token);
+        if (!token.trim()) return token; // preserve whitespace
+
+        // Check if the exact token is English
+        if (isEnglish(token)) return token;
+
+        // Check if it's an English word wrapped or followed by punctuation
+        // e.g., "Ca,", "(XRD)", or "K3."
+        const matchBoth = token.match(/^([({\[]+)(.+?)([.,;:!?)}\]]+)$/);
+        if (matchBoth && isEnglish(matchBoth[2])) return token;
+
+        const matchTrailing = token.match(/^(.+?)([.,;:!?)}\]]+)$/);
+        if (matchTrailing && isEnglish(matchTrailing[1])) return token;
+
+        const matchPrefix = token.match(/^([({\[]+)(.+?)$/);
+        if (matchPrefix && isEnglish(matchPrefix[2])) return token;
+
+        // For everything else (Legacy Sinhala), apply the single-pass mapped conversions
+        return performSinglePass(token, reverseRegex, reverseLookup);
     }).join('');
 }
 
@@ -346,15 +372,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reverse Conversion logic
     const updateReverseConversion = () => {
-        const legacyText = legacyInput.value;
-        const unicodeText = reverseConvert(legacyText, reversePreserveToggle.checked);
-        unicodeOutput.value = unicodeText;
+        if (!reversePreserveToggle.checked) {
+            const legacyText = legacyInput.innerText;
+            unicodeOutput.value = reverseConvert(legacyText, false);
+            return;
+        }
+
+        // DOM-based conversion for rich text precision
+        const nodes = Array.from(legacyInput.childNodes);
+        const resultParts = nodes.map(node => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                // Top-level text nodes use heuristics
+                return reverseConvert(node.textContent, true);
+            }
+
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const style = window.getComputedStyle(node);
+                const fontFamily = style.fontFamily;
+                
+                // Detection patterns for legacy font
+                const isLegacy = fontFamily.includes('FMAbhaya') || 
+                                 node.classList.contains('font-legacy') ||
+                                 (node.getAttribute('style') || '').includes('FMAbhaya');
+                
+                // Detection patterns for standard font (English)
+                const isStd = node.classList.contains('font-std') || 
+                              ((fontFamily.includes('Aptos') || fontFamily.includes('Inter')) && !isLegacy);
+
+                if (isLegacy) {
+                    return reverseConvert(node.innerText || node.textContent, false);
+                } else if (isStd) {
+                    return node.innerText || node.textContent;
+                } else {
+                    // Mixed or unstyled element - use heuristic
+                    return reverseConvert(node.innerText || node.textContent, true);
+                }
+            }
+            return "";
+        });
+
+        unicodeOutput.value = resultParts.join('');
     };
 
     // Event Listeners
     inputArea.addEventListener('input', updateForwardConversion);
     preserveToggle.addEventListener('change', updateForwardConversion);
+    
+    // For contenteditable, 'input' event works for typing and most modifications
     legacyInput.addEventListener('input', updateReverseConversion);
+    
+    // Explicit 'paste' handler to ensure we catch formatting changes
+    legacyInput.addEventListener('paste', () => {
+        setTimeout(updateReverseConversion, 0);
+    });
+
     reversePreserveToggle.addEventListener('change', updateReverseConversion);
 
     clearForwardBtn.addEventListener('click', () => {
@@ -365,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     clearReverseBtn.addEventListener('click', () => {
-        legacyInput.value = '';
+        legacyInput.innerHTML = '';
         unicodeOutput.value = '';
         legacyInput.focus();
     });
