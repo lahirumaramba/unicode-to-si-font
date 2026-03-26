@@ -122,9 +122,63 @@ const reverseMapping = mapping
     // Sort by pattern length descending to match longest sequences first
     .sort((a, b) => b.p.source.length - a.p.source.length);
 
-function reverseConvert(legacyText) {
+// Heuristic to detect if a word is likely English/Technical rather than Legacy Sinhala
+function isEnglish(word) {
+    if (!word) return false;
+    
+    // 1. If it contains any character > 127 it is definitely Legacy
+    for (let i = 0; i < word.length; i++) {
+        if (word.charCodeAt(i) > 127) return false;
+    }
+
+    // 2. If it contains symbols frequently used in legacy pilla/hal-kirilla mappings
+    // Symbols like =, !, %, +, *, º, ^, &, (, ), [, ], {, }, /, ?, :, ;, ,, ., ', ~, |
+    if (/[=!%+º^&()\[\]{}/?:;.,'~|]/.test(word)) return false;
+
+    // 3. All-Caps acronyms (length > 1) are likely English (XRD, DNA)
+    if (word.length > 1 && /^[A-Z0-9]+$/.test(word)) return true;
+
+    // 4. TitleCase (length > 1) are likely English/Proper nouns (Ca, Iron, Fe)
+    if (word.length > 1 && /^[A-Z][a-z0-9]+$/.test(word)) return true;
+
+    // 5. Common English stop-words and technical terms
+    const stopWords = new Set([
+        'and', 'the', 'for', 'was', 'with', 'from', 'this', 'that', 'layer', 'paint', 'result',
+        'sample', 'analysis', 'data', 'using', 'based', 'both', 'between', 'mixed', 'font',
+        'through', 'during', 'should', 'could', 'would', 'above', 'below', 'which', 'where'
+    ]);
+    if (stopWords.has(word.toLowerCase())) return true;
+
+    // 6. If it contains digits mixed with letters (K3, H2O)
+    if (/[0-9]/.test(word) && /[a-zA-Z]/.test(word)) return true;
+
+    // Default to false (treat as legacy) for strings like 'isa' which could be legacy 'සි'
+    return false;
+}
+
+function reverseConvert(legacyText, preserveEnglish) {
     if (!legacyText) return "";
-    return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), legacyText);
+    
+    if (!preserveEnglish) {
+        return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), legacyText);
+    }
+
+    // Tokenize by standard ASCII alphanumeric sequences vs everything else
+    // This isolates potential English words from Sinhala Unicode or symbols
+    const tokens = legacyText.split(/([a-zA-Z0-9]+)/);
+    return tokens.map(token => {
+        if (!token) return "";
+        // If it's a potential English word (pure ASCII alphanumeric)
+        if (/^[a-zA-Z0-9]+$/.test(token)) {
+            if (isEnglish(token)) {
+                return token; // Preserve English
+            } else {
+                return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), token);
+            }
+        }
+        // For everything else (Unicode, symbols, whitespace), apply mapping
+        return reverseMapping.reduce((result, { p, r }) => result.replace(p, r), token);
+    }).join('');
 }
 
 function convert(unicodeText, preserveEnglish) {
@@ -191,6 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const unicodeOutput = document.getElementById('unicode-output');
     const reverseCopyBtn = document.getElementById('reverse-copy-btn');
     const reverseCopyStatus = document.getElementById('reverse-copy-status');
+    const reversePreserveToggle = document.getElementById('reverse-preserve-english');
+    const clearForwardBtn = document.getElementById('clear-forward');
+    const clearReverseBtn = document.getElementById('clear-reverse');
 
     // Tab Interface
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -290,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reverse Conversion logic
     const updateReverseConversion = () => {
         const legacyText = legacyInput.value;
-        const unicodeText = reverseConvert(legacyText);
+        const unicodeText = reverseConvert(legacyText, reversePreserveToggle.checked);
         unicodeOutput.value = unicodeText;
     };
 
@@ -298,6 +355,20 @@ document.addEventListener('DOMContentLoaded', () => {
     inputArea.addEventListener('input', updateForwardConversion);
     preserveToggle.addEventListener('change', updateForwardConversion);
     legacyInput.addEventListener('input', updateReverseConversion);
+    reversePreserveToggle.addEventListener('change', updateReverseConversion);
+
+    clearForwardBtn.addEventListener('click', () => {
+        inputArea.value = '';
+        outputArea.value = '';
+        renderPreview('', preserveToggle.checked);
+        inputArea.focus();
+    });
+
+    clearReverseBtn.addEventListener('click', () => {
+        legacyInput.value = '';
+        unicodeOutput.value = '';
+        legacyInput.focus();
+    });
 
     copyBtn.addEventListener('click', () => {
         outputArea.select();
