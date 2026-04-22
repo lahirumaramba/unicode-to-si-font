@@ -463,14 +463,24 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const htmlChunks = Array.from(previewArea.childNodes).map(node => {
+            let htmlChunks = '<div style="text-align: left;">';
+            Array.from(previewArea.childNodes).forEach(node => {
                 const text = node.textContent;
-                const escapedText = escapeHTML(text).replace(/\n/g, '<br>');
-                if (node.nodeType === Node.TEXT_NODE) return escapedText;
-                const isLegacy = node.classList.contains('font-legacy');
+                const isLegacy = node.classList?.contains('font-legacy');
                 const font = isLegacy ? "'FMAbhaya', serif" : "'Aptos', sans-serif";
-                return `<span style="font-family: ${font}; font-size: 14pt;">${escapedText}</span>`;
-            }).join('');
+                
+                const parts = text.split('\n\n');
+                parts.forEach((part, i) => {
+                    if (i > 0) {
+                        htmlChunks += '</div><div style="text-align: left;">';
+                    }
+                    if (part) {
+                        const escaped = escapeHTML(part).replace(/\n/g, '<br>');
+                        htmlChunks += `<span style="font-family: ${font}; font-size: 14pt;">${escaped}</span>`;
+                    }
+                });
+            });
+            htmlChunks += '</div>';
 
             const plainText = previewArea.innerText;
             const data = [new ClipboardItem({
