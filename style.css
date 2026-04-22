@@ -262,6 +262,8 @@ textarea:focus, .rich-input:focus {
     background: white;
     font-size: 14pt;
     line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .font-legacy {

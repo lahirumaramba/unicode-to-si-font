@@ -363,7 +363,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 span.className = 'font-legacy';
                 span.textContent = mapping.reduce((result, { p, r }) => result.replace(p, r), token.text);
             } else {
-                span.className = 'font-std';
+                if (token.type !== 'whitespace') {
+                    span.className = 'font-std';
+                }
                 span.textContent = token.text;
             }
             previewArea.appendChild(span);
