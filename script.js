@@ -465,10 +465,11 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const htmlChunks = Array.from(previewArea.childNodes).map(node => {
                 const text = node.textContent;
-                if (node.nodeType === Node.TEXT_NODE) return escapeHTML(text);
+                const escapedText = escapeHTML(text).replace(/\n/g, '<br>');
+                if (node.nodeType === Node.TEXT_NODE) return escapedText;
                 const isLegacy = node.classList.contains('font-legacy');
                 const font = isLegacy ? "'FMAbhaya', serif" : "'Aptos', sans-serif";
-                return `<span style="font-family: ${font}; font-size: 14pt;">${escapeHTML(text)}</span>`;
+                return `<span style="font-family: ${font}; font-size: 14pt;">${escapedText}</span>`;
             }).join('');
 
             const plainText = previewArea.innerText;
